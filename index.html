@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recibo PRO - ROYGARCIA</title>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+<style>
+body{margin:0;font-family:Arial;background:#111;display:flex;justify-content:center;}
+#recibo{width:360px;background:#f5f5f5;border-radius:20px;overflow:hidden;}
+.header{background:linear-gradient(135deg,#0B3C8C,#E30613);color:#fff;padding:20px;display:flex;align-items:center;gap:10px;}
+.header img{width:70px;}
+.titulo{background:#E30613;color:#fff;text-align:center;padding:12px;margin:15px;border-radius:10px;font-weight:bold;}
+.contenido{padding:15px;}
+input,select{border:none;background:transparent;font-size:16px;width:100%;}
+.fila{margin-bottom:10px;}
+table{width:100%;margin-top:10px;border-collapse:collapse;}
+td{padding:6px;border-bottom:1px solid #ddd;}
+.totales{display:flex;gap:10px;margin-top:15px;}
+.total{flex:1;background:#E30613;color:#fff;padding:10px;text-align:center;border-radius:10px;}
+.saldo{flex:1;background:#0B3C8C;color:#fff;padding:10px;text-align:center;border-radius:10px;}
+.botones{padding:15px;}
+button{width:100%;padding:10px;margin-top:8px;border:none;color:#fff;border-radius:8px;font-weight:bold;}
+.add{background:#0B3C8C;}
+.del{background:#999;}
+.img{background:#E30613;}
+.wa{background:#25D366;}
+.save{background:#0B3C8C;}
+.subtotal{font-weight:bold;text-align:right;}
+</style>
+</head>
+
+<body>
+
+<div id="recibo">
+
+<div class="header">
+<img src="logo.png">
+<div>
+<h2>ROYGARCIA</h2>
+<p>Sellos personalizados</p>
+</div>
+</div>
+
+<div class="titulo">RECIBO</div>
+
+<div class="contenido">
+
+<div class="fila">
+<b>Cliente:</b>
+<input id="cliente" placeholder="Nombre cliente">
+</div>
+
+<div class="fila">
+<select id="listaClientes" onchange="cargarCliente()">
+<option value="">Clientes guardados</option>
+</select>
+</div>
+
+<div class="fila">
+<b>Fecha:</b>
+<input id="fecha">
+</div>
+
+<table id="tabla">
+<tr>
+<td><b>Detalle</b></td>
+<td><b>Cant</b></td>
+<td><b>Precio</b></td>
+<td><b>Sub</b></td>
+<td></td>
+</tr>
+</table>
+
+<button class="add" onclick="agregarFila()">+ Agregar producto</button>
+
+<div class="fila">
+<b>Adelanto:</b>
+<input id="adelanto" type="number" value="0">
+</div>
+
+<div class="totales">
+<div class="total" id="total">TOTAL: Bs. 0</div>
+<div class="saldo" id="saldo">SALDO: Bs. 0</div>
+</div>
+
+</div>
+
+<div class="botones">
+<button class="save" onclick="guardarCliente()">Guardar Cliente</button>
+<button class="img" onclick="descargar()">Descargar Imagen</button>
+<button class="wa" onclick="enviar()">WhatsApp</button>
+</div>
+
+</div>
+
+<script>
+
+// fecha automática
+window.onload = ()=>{
+ fecha.value = new Date().toISOString().split('T')[0];
+ cargarLista();
+ agregarFila();
+}
+
+// formato moneda
+function bs(n){ return "Bs. " + n.toLocaleString('es-BO'); }
+
+// agregar fila
+function agregarFila(){
+ let tr = document.createElement("tr");
+ tr.innerHTML = `
+  <td><input placeholder="Producto"></td>
+  <td><input type="number" oninput="calcular()"></td>
+  <td><input type="number" oninput="calcular()"></td>
+  <td class="subtotal">0</td>
+  <td><button class="del" onclick="this.closest('tr').remove();calcular()">X</button></td>
+ `;
+ tabla.appendChild(tr);
+}
+
+// calcular
+function calcular(){
+ let total = 0;
+
+ document.querySelectorAll("#tabla tr").forEach((tr,i)=>{
+  if(i==0) return;
+
+  let inp = tr.querySelectorAll("input");
+  let cant = +inp[1].value || 0;
+  let precio = +inp[2].value || 0;
+
+  let sub = cant * precio;
+  tr.querySelector(".subtotal").innerText = bs(sub);
+
+  total += sub;
+ });
+
+ let adel = +adelanto.value || 0;
+
+ totalEl.innerText = "TOTAL: " + bs(total);
+ saldoEl.innerText = "SALDO: " + bs(total - adel);
+}
+
+// auto calcular
+document.addEventListener("input", e=>{
+ if(e.target.closest("#tabla") || e.target.id==="adelanto"){
+  calcular();
+ }
+});
+
+// clientes
+function guardarCliente(){
+ let n = cliente.value.trim();
+ if(!n) return;
+
+ let lista = JSON.parse(localStorage.getItem("clientes")||"[]");
+ if(!lista.includes(n)){
+  lista.push(n);
+  localStorage.setItem("clientes", JSON.stringify(lista));
+  cargarLista();
+ }
+}
+
+function cargarLista(){
+ let lista = JSON.parse(localStorage.getItem("clientes")||"[]");
+ listaClientes.innerHTML = '<option value="">Clientes guardados</option>';
+ lista.forEach(c=>{
+  let o = document.createElement("option");
+  o.value = c;
+  o.textContent = c;
+  listaClientes.appendChild(o);
+ });
+}
+
+function cargarCliente(){
+ cliente.value = listaClientes.value;
+}
+
+// imagen
+function descargar(){
+ let b = document.querySelector(".botones");
+ b.style.display="none";
+
+ html2canvas(recibo,{scale:2}).then(c=>{
+  let a=document.createElement("a");
+  a.download="recibo.png";
+  a.href=c.toDataURL();
+  a.click();
+  b.style.display="block";
+ });
+}
+
+// whatsapp
+function enviar(){
+ window.open("https://wa.me/?text="+encodeURIComponent(totalEl.innerText));
+}
+
+const totalEl = document.getElementById("total");
+const saldoEl = document.getElementById("saldo");
+
+</script>
+
+</body>
+</html>
