@@ -216,15 +216,15 @@ const miModal = document.getElementById("miModal");
 const contenedorImagenModal = document.getElementById("contenedorImagenModal");
 const nroReciboTexto = document.getElementById("nroReciboTexto");
 const marcaCancelado = document.getElementById("marcaCancelado");
-
+let baseDeDatosNube = [];
 let numeroActual = parseInt(localStorage.getItem("nroReciboCorrelativo")) || 1;
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqx0LAckGZ7wUoMbdQ1X2EGxj5Wfm1evi3ZHcjA6OFVqfJAFAmk7zNGuyLry6h9gev/exec";
   
 window.onload = ()=>{
  fechaInp.value = new Date().toISOString().split('T')[0];
  actualizarVisorNumero();
- cargarLista();
- agregarFila(); // Genera la primera fila vacía al arrancar
+ sincronizarConNube();
+ agregarFila();
 }
 
 function actualizarVisorNumero() {
@@ -364,6 +364,68 @@ function ajustarNumeroManual() {
     localStorage.setItem("nroReciboCorrelativo", numeroActual);
     actualizarVisorNumero();
   }
+  function sincronizarConNube() {
+  fetch(SCRIPT_URL)
+    .then(res => res.json())
+    .then(data => {
+      baseDeDatosNube = data;
+      actualizarSelectorClientes();
+    })
+    .catch(() => {
+      listaClientes.innerHTML = '<option value="">📁 Error de conexión nube</option>';
+    });
+}
+
+function actualizarSelectorClientes() {
+  let nombresUnicos = [...new Set(baseDeDatosNube.map(item => item.cliente.trim()))].sort();
+  listaClientes.innerHTML = '<option value="">📁 Clientes en Google Sheets</option>';
+  nombresUnicos.forEach(nombre => {
+    if(nombre) {
+      let o = document.createElement("option");
+      o.value = nombre; o.textContent = nombre;
+      listaClientes.appendChild(o);
+    }
+  });
+}
+
+function guardarCliente(){
+ let nombreCliente = clienteInp.value.trim();
+ if(!nombreCliente) return alert("Por favor escribe el nombre de un cliente.");
+
+ let productosLlevados = [];
+ cuerpoTabla.querySelectorAll("tr").forEach(tr => {
+    let det = tr.querySelector(".prod-detalle").value || "Sello";
+    let cant = tr.querySelector(".prod-cant").value || 1;
+    let prec = tr.querySelector(".prod-precio").value || 0;
+    if(prec > 0) productosLlevados.push(`${cant}x ${det} (Bs. ${Number(prec)})`);
+ });
+
+ let datosAEnviar = {
+    recibo: nroReciboTexto.innerText,
+    fecha: fechaInp.value,
+    cliente: nombreCliente,
+    detalles: productosLlevados.join(", ") || "Ficha cliente",
+    total: totalEl.innerText.replace("TOTAL: Bs. ", ""),
+    obs: observacionInp.value.trim() || "Sin notas."
+ };
+
+ fetch(SCRIPT_URL, {
+   method: "POST",
+   mode: "no-cors",
+   headers: { "Content-Type": "application/json" },
+   body: JSON.stringify(datosAEnviar)
+ })
+ .then(() => {
+   alert("¡Éxito! Guardado en Google Sheets.");
+   setTimeout(sincronizarConNube, 1500); 
+ });
+}
+
+function cargarCliente(){
+ if(listaClientes.value) {
+   clienteInp.value = listaClientes.value;
+ }
+}
 }
 </script>
 
