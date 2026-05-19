@@ -218,7 +218,8 @@ const nroReciboTexto = document.getElementById("nroReciboTexto");
 const marcaCancelado = document.getElementById("marcaCancelado");
 
 let numeroActual = parseInt(localStorage.getItem("nroReciboCorrelativo")) || 1;
-
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqx0LAckGZ7wUoMbdQ1X2EGxj5Wfm1evi3ZHcjA6OFVqfJAFAmk7zNGuyLry6h9gev/exec";
+  
 window.onload = ()=>{
  fechaInp.value = new Date().toISOString().split('T')[0];
  actualizarVisorNumero();
