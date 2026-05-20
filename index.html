@@ -65,6 +65,30 @@ button:active{transform: scale(0.98);}
 .reset-btn{background:transparent; color:#777; font-size:11px; padding:4px; margin-top:10px; text-decoration:underline; font-weight:normal;}
 .subtotal{font-weight:bold;text-align:right;}
 
+/* SECCIÓN HISTORIAL */
+.historial-box {
+  margin-top: 15px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px;
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+.historial-titulo {
+  font-weight: bold;
+  color: #0B3C8C;
+  margin-bottom: 5px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 3px;
+}
+.historial-item {
+  padding: 5px 0;
+  border-bottom: 1px dashed #eee;
+}
+.historial-item:last-child { border-bottom: none; }
+
 /* Quitar flechas inputs de número */
 input[type=number]::-webkit-inner-spin-button, 
 input[type=number]::-webkit-outer-spin-button { 
@@ -75,7 +99,7 @@ input[type=number] { -moz-appearance: textfield; }
 
 .texto-referencia{display:none;font-size:16px;}
 
-/* MODAL FLOTANTE (ESTILOS QUE CAPTURAN TODA LA PANTALLA) */
+/* MODAL FLOTANTE */
 .modal {
   display: none; 
   position: fixed; 
@@ -148,7 +172,7 @@ input[type=number] { -moz-appearance: textfield; }
 
       <div class="fila">
         <b>Cliente:</b>
-        <input id="cliente" placeholder="Nombre cliente">
+        <input id="cliente" placeholder="Nombre cliente" oninput="limpiarHistorialSiVacio()">
       </div>
 
       <div class="fila">
@@ -187,6 +211,11 @@ input[type=number] { -moz-appearance: textfield; }
         <div class="total" id="total">TOTAL: Bs. 0</div>
         <div class="saldo" id="saldo">SALDO: Bs. 0</div>
       </div>
+
+      <div id="seccionHistorial" class="historial-box" style="display:none;">
+        <div class="historial-titulo">📁 Historial de Trabajos Anteriores:</div>
+        <div id="historialContenido"></div>
+      </div>
       
       <div class="pie-recibo">
         "RoyGarcia" forma parte del grupo Galan
@@ -223,6 +252,8 @@ const miModal = document.getElementById("miModal");
 const contenedorImagenModal = document.getElementById("contenedorImagenModal");
 const nroReciboTexto = document.getElementById("nroReciboTexto");
 const marcaCancelado = document.getElementById("marcaCancelado");
+const seccionHistorial = document.getElementById("seccionHistorial");
+const historialContenido = document.getElementById("historialContenido");
 
 let numeroActual = parseInt(localStorage.getItem("nroReciboCorrelativo")) || 1;
 let globalTotal = 0;
@@ -318,6 +349,7 @@ function guardarCliente(){
   localStorage.setItem("clientes", JSON.stringify(lista));
   cargarLista();
   alert("Cliente guardado con éxito.");
+  mostrarHistorialCliente(n);
  } else {
   alert("El cliente ya estaba guardado.");
  }
@@ -338,10 +370,61 @@ function cargarLista(){
 function cargarCliente(){
  if(listaClientes && clienteInp && listaClientes.value) {
    clienteInp.value = listaClientes.value;
+   mostrarHistorialCliente(listaClientes.value);
  }
 }
 
-/* FUNCIÓN DE ENVÍO ACTUALIZADA CON OBSERVACIONES */
+function limpiarHistorialSiVacio() {
+  if (clienteInp && clienteInp.value.trim() === "") {
+    if (seccionHistorial) seccionHistorial.style.display = "none";
+  }
+}
+
+/* MOSTRAR EL HISTORIAL DEL CLIENTE EN PANTALLA */
+function mostrarHistorialCliente(nombreCliente) {
+  if (!historialContenido || !seccionHistorial) return;
+  
+  let todosLosHistoriales = JSON.parse(localStorage.getItem("historialTrabajos") || "{}");
+  let historialCliente = todosLosHistoriales[nombreCliente] || [];
+  
+  if (historialCliente.length === 0) {
+    seccionHistorial.style.display = "none";
+    return;
+  }
+  
+  historialContenido.innerHTML = "";
+  // Mostramos los más recientes primero
+  historialCliente.slice().reverse().forEach(item => {
+    let div = document.createElement("div");
+    div.className = "historial-item";
+    div.innerHTML = `📅 <b>${item.fecha}</b> - Recibo #${item.nro} <br> 
+                     🛠️ ${item.detalles} <br>
+                     💰 Total: ${bs(item.total)} | 🔴 Saldo: <b>${bs(item.saldo)}</b>`;
+    historialContenido.appendChild(div);
+  });
+  
+  seccionHistorial.style.display = "block";
+}
+
+/* AGREGAR TRABAJO AL HISTORIAL INTERNO */
+function guardarEnHistorialLocal(nombreCliente, nroRecibo, fecha, detalles, total, saldo) {
+  let todosLosHistoriales = JSON.parse(localStorage.getItem("historialTrabajos") || "{}");
+  
+  if (!todosLosHistoriales[nombreCliente]) {
+    todosLosHistoriales[nombreCliente] = [];
+  }
+  
+  todosLosHistoriales[nombreCliente].push({
+    nro: nroRecibo,
+    fecha: fecha,
+    detalles: detalles,
+    total: total,
+    saldo: saldo
+  });
+  
+  localStorage.setItem("historialTrabajos", JSON.stringify(todosLosHistoriales));
+}
+
 function procesarEnvioYGuardado() {
   if(!clienteInp || !fechaInp) return;
   let clienteNombre = clienteInp.value.trim();
@@ -377,17 +460,25 @@ function procesarEnvioYGuardado() {
     return;
   }
 
+  let nroFormateado = String(numeroActual).padStart(5, '0');
+  let detallesTexto = productos.join(" | ");
+  let totalNum = globalTotal;
+  let saldoNum = globalSaldo;
+
   let nuevoRegistro = {
-    nroRecibo: String(numeroActual).padStart(5, '0'),
+    nroRecibo: nroFormateado,
     fecha: fechaRecibo,
     cliente: clienteNombre,
-    detalles: productos.join(" | "),
+    detalles: detallesTexto,
     observaciones: obsTexto,
-    total: globalTotal,
+    total: totalNum,
     adelanto: adelantoInp ? (Number(adelantoInp.value) || 0) : 0,
-    saldo: globalSaldo,
-    estado: globalSaldo <= 0 ? "CANCELADO" : "CON SALDO"
+    saldo: saldoNum,
+    estado: saldoNum <= 0 ? "CANCELADO" : "CON SALDO"
   };
+
+  // Guardamos en el historial del teléfono antes de enviar
+  guardarEnHistorialLocal(clienteNombre, nroFormateado, fechaRecibo, detallesTexto, totalNum, saldoNum);
 
   let listaClientesRapida = JSON.parse(localStorage.getItem("clientes") || "[]");
   if (!listaClientesRapida.includes(clienteNombre)) {
@@ -418,7 +509,9 @@ function generarImagenParaCompartir(){
  let textosCant = document.querySelectorAll(".txt-cant");
  let textosPrecio = document.querySelectorAll(".txt-precio");
  
- // Manejo de la visualización del campo observaciones en el capture
+ // Ocultar el cuadro de historial en la foto de WhatsApp
+ if(seccionHistorial) seccionHistorial.style.display = "none";
+ 
  let obsInput = document.getElementById("observaciones");
  let txtObs = document.getElementById("txt-observaciones");
  if(obsInput && txtObs) {
@@ -455,11 +548,13 @@ function generarImagenParaCompartir(){
   textosCant.forEach(t => t.style.display = "none");
   textosPrecio.forEach(t => t.style.display = "none");
   
-  // Reestablecer campo observaciones editable
   if(obsInput && txtObs) {
     obsInput.style.display = "inline-block";
     txtObs.style.display = "none";
   }
+
+  // Volver a mostrar el historial en la pantalla local después de la captura
+  mostrarHistorialCliente(clienteInp.value.trim());
 
   numeroActual++;
   localStorage.setItem("nroReciboCorrelativo", numeroActual);
