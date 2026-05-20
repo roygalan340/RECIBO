@@ -175,6 +175,7 @@ input[type=number] { -moz-appearance: textfield; }
       <div class="fila" style="margin-top:15px;">
         <b>Observaciones / Razón del precio:</b>
         <input id="observaciones" placeholder="Ej. Se hizo rebaja por cliente frecuente o detalle">
+        <span id="txt-observaciones" class="texto-referencia"></span>
       </div>
 
       <div class="fila" style="margin-top:15px;">
@@ -417,6 +418,15 @@ function generarImagenParaCompartir(){
  let textosCant = document.querySelectorAll(".txt-cant");
  let textosPrecio = document.querySelectorAll(".txt-precio");
  
+ // Manejo de la visualización del campo observaciones en el capture
+ let obsInput = document.getElementById("observaciones");
+ let txtObs = document.getElementById("txt-observaciones");
+ if(obsInput && txtObs) {
+   txtObs.innerText = obsInput.value.trim() !== "" ? obsInput.value.trim() : "Ninguna";
+   obsInput.style.display = "none";
+   txtObs.style.display = "inline-block";
+ }
+ 
  if(btnAdd) btnAdd.style.display = "none";
  d.forEach(x => x.style.display = "none");
  
@@ -444,6 +454,12 @@ function generarImagenParaCompartir(){
   inputsPrecio.forEach(i => i.style.display = "inline-block");
   textosCant.forEach(t => t.style.display = "none");
   textosPrecio.forEach(t => t.style.display = "none");
+  
+  // Reestablecer campo observaciones editable
+  if(obsInput && txtObs) {
+    obsInput.style.display = "inline-block";
+    txtObs.style.display = "none";
+  }
 
   numeroActual++;
   localStorage.setItem("nroReciboCorrelativo", numeroActual);
