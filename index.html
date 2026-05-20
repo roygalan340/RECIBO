@@ -58,7 +58,7 @@ td{padding:6px;border-bottom:1px solid #ddd;vertical-align: middle;}
 .select-interno{background: #fff;border: 1px solid #ccc;border-radius: 8px;padding: 8px;margin-bottom: 10px;font-weight: bold;color: #333;}
 button{width:100%;padding:12px;margin-top:8px;border:none;color:#fff;border-radius:8px;font-weight:bold;cursor:pointer;transition: 0.2s;}
 button:active{transform: scale(0.98);}
-.add{background:#0B3C8C; display:block; margin-bottom: 10px;}
+.add{background:#0B3C8C;}
 .del{background:#999;padding:4px 8px;font-size:12px;margin:0;width:auto;display:inline-block;}
 .wa{background:#25D366;}
 .save{background:#555;}
@@ -75,14 +75,14 @@ input[type=number] { -moz-appearance: textfield; }
 
 .texto-referencia{display:none;font-size:16px;}
 
-/* MODAL FLOTANTE */
+/* MODAL FLOTANTE (ESTILOS QUE CAPTURAN TODA LA PANTALLA) */
 .modal {
   display: none; 
   position: fixed; 
   z-index: 1000; 
   left: 0; top: 0; 
   width: 100%; height: 100%; 
-  background-color: rgba(0,0,0,0.9);
+  background-color: rgba(0,0,0,0.95);
   justify-content: center; 
   align-items: center;
   flex-direction: column;
@@ -92,8 +92,9 @@ input[type=number] { -moz-appearance: textfield; }
   padding: 10px;
   border-radius: 20px;
   max-width: 90%;
-  max-height: 85%;
+  max-height: 75%;
   text-align: center;
+  overflow-y: auto;
 }
 .modal-contenido img {
   max-width: 100%;
@@ -166,7 +167,7 @@ input[type=number] { -moz-appearance: textfield; }
           </tr>
         </thead>
         <tbody id="cuerpoTabla">
-          </tbody>
+        </tbody>
       </table>
 
       <button class="add" onclick="agregarFila()">+ Agregar producto</button>
@@ -192,7 +193,7 @@ input[type=number] { -moz-appearance: textfield; }
       <option value="">📁 Clientes guardados</option>
     </select>
     <button class="save" onclick="guardarCliente()">Guardar Cliente</button>
-    <button class="wa" onclick="generarImagenParaCompartir()">Enviar por WhatsApp</button>
+    <button class="wa" onclick="procesarEnvioYGuardado()">Enviar por WhatsApp</button>
     <button class="reset-btn" onclick="ajustarNumeroManual()">⚙️ Ajustar número de recibo inicial</button>
   </div>
 
@@ -216,24 +217,26 @@ const miModal = document.getElementById("miModal");
 const contenedorImagenModal = document.getElementById("contenedorImagenModal");
 const nroReciboTexto = document.getElementById("nroReciboTexto");
 const marcaCancelado = document.getElementById("marcaCancelado");
-let baseDeDatosNube = [];
+
 let numeroActual = parseInt(localStorage.getItem("nroReciboCorrelativo")) || 1;
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwgTJloJe6ZfjsCCHE4pvWz0yCewEc40gl1delprzyHyCKHFB8TTSxPcXnhAzgLgO4d/exec";
-  
+let globalTotal = 0;
+let globalSaldo = 0;
+
 window.onload = ()=>{
- fechaInp.value = new Date().toISOString().split('T')[0];
- actualizarVisorNumero();
- sincronizarConNube();
- agregarFila();
+  if(fechaInp) fechaInp.value = new Date().toISOString().split('T')[0];
+  actualizarVisorNumero();
+  cargarLista();
+  agregarFila();
 }
 
 function actualizarVisorNumero() {
-  nroReciboTexto.innerText = String(numeroActual).padStart(5, '0');
+  if(nroReciboTexto) nroReciboTexto.innerText = String(numeroActual).padStart(5, '0');
 }
 
-function bs(n){ return "Bs. " + n.toLocaleString('es-BO', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function bs(n){ 
+  return "Bs. " + (Number(n) || 0).toLocaleString('es-BO', {minimumFractionDigits: 2, maximumFractionDigits: 2}); 
+}
 
-// FILAS CORREGIDAS Y SEGUROS DE RENDERIZADO
 function agregarFila(){
  let tr = document.createElement("tr");
  tr.innerHTML = `
@@ -249,42 +252,57 @@ function agregarFila(){
   <td class="subtotal">Bs. 0.00</td>
   <td><button class="del" onclick="this.closest('tr').remove();calcular()">X</button></td>
  `;
- cuerpoTabla.appendChild(tr);
- calcular();
+ if(cuerpoTabla) {
+   cuerpoTabla.appendChild(tr);
+   calcular();
+ }
 }
 
 function calcular(){
  let total = 0;
+ if(!cuerpoTabla) return;
  let filas = cuerpoTabla.querySelectorAll("tr");
 
  filas.forEach(tr => {
-  let cantRaw = tr.querySelector(".prod-cant").value;
-  let cant = cantRaw === "" ? 1 : +cantRaw;
-  let precio = +tr.querySelector(".prod-precio").value || 0;
+  let txtCant = tr.querySelector(".txt-cant");
+  let txtPrecio = tr.querySelector(".txt-precio");
+  let prodCantInput = tr.querySelector(".prod-cant");
+  let prodPrecioInput = tr.querySelector(".prod-precio");
 
-  tr.querySelector(".txt-cant").innerText = cant;
-  tr.querySelector(".txt-precio").innerText = precio;
+  let cantRaw = prodCantInput ? prodCantInput.value : "";
+  let cant = cantRaw === "" ? 1 : (Number(cantRaw) || 0);
+  let precio = prodPrecioInput ? (Number(prodPrecioInput.value) || 0) : 0;
+
+  if(txtCant) txtCant.innerText = cant;
+  if(txtPrecio) txtPrecio.innerText = precio;
 
   let sub = cant * precio;
-  tr.querySelector(".subtotal").innerText = bs(sub);
+  let subtotalEl = tr.querySelector(".subtotal");
+  if(subtotalEl) subtotalEl.innerText = bs(sub);
 
   total += sub;
  });
 
- let adel = +adelantoInp.value || 0;
+ let adel = adelantoInp ? (Number(adelantoInp.value) || 0) : 0;
  let saldoCalculado = total - adel;
 
- totalEl.innerText = "TOTAL: " + bs(total);
- saldoEl.innerText = "SALDO: " + bs(saldoCalculado);
+ globalTotal = total;
+ globalSaldo = saldoCalculado;
 
- if(total > 0 && saldoCalculado <= 0) {
-   marcaCancelado.style.display = "block";
- } else {
-   marcaCancelado.style.display = "none";
+ if(totalEl) totalEl.innerText = "TOTAL: " + bs(total);
+ if(saldoEl) saldoEl.innerText = "SALDO: " + bs(saldoCalculado);
+
+ if(marcaCancelado) {
+   if(total > 0 && saldoCalculado <= 0) {
+     marcaCancelado.style.display = "block";
+   } else {
+     marcaCancelado.style.display = "none";
+   }
  }
 }
 
 function guardarCliente(){
+ if(!clienteInp) return;
  let n = clienteInp.value.trim();
  if(!n) return alert("Escribe un nombre de cliente primero.");
 
@@ -300,6 +318,7 @@ function guardarCliente(){
 }
 
 function cargarLista(){
+ if(!listaClientes) return;
  let lista = JSON.parse(localStorage.getItem("clientes")||"[]");
  listaClientes.innerHTML = '<option value="">📁 Clientes guardados</option>';
  lista.forEach(c=>{
@@ -311,9 +330,73 @@ function cargarLista(){
 }
 
 function cargarCliente(){
- if(listaClientes.value) {
+ if(listaClientes && clienteInp && listaClientes.value) {
    clienteInp.value = listaClientes.value;
  }
+}
+
+function procesarEnvioYGuardado() {
+  if(!clienteInp || !fechaInp) return;
+  let clienteNombre = clienteInp.value.trim();
+  let fechaRecibo = fechaInp.value;
+  
+  if (!clienteNombre) {
+    alert("❌ Error: Debes ingresar el nombre del cliente antes de enviar.");
+    return;
+  }
+
+  if(!cuerpoTabla) return;
+  let productos = [];
+  let filas = cuerpoTabla.querySelectorAll("tr");
+  filas.forEach(tr => {
+    let detalleInput = tr.querySelector(".prod-detalle");
+    let detalle = detalleInput ? detalleInput.value.trim() : "";
+    let cantRawInput = tr.querySelector(".prod-cant");
+    let cantRaw = cantRawInput ? cantRawInput.value : "";
+    let cant = cantRaw === "" ? 1 : (Number(cantRaw) || 0);
+    let precioInput = tr.querySelector(".prod-precio");
+    let precio = precioInput ? (Number(precioInput.value) || 0) : 0;
+    
+    if (detalle !== "" || precio > 0) {
+      productos.push(`${cant}x ${detalle} (${bs(precio)})`);
+    }
+  });
+
+  if (productos.length === 0) {
+    alert("❌ Error: El recibo debe tener al menos un producto.");
+    return;
+  }
+
+  let nuevoRegistro = {
+    nroRecibo: String(numeroActual).padStart(5, '0'),
+    fecha: fechaRecibo,
+    cliente: clienteNombre,
+    detalles: productos.join(" | "),
+    total: globalTotal,
+    adelanto: adelantoInp ? (Number(adelantoInp.value) || 0) : 0,
+    saldo: globalSaldo,
+    estado: globalSaldo <= 0 ? "CANCELADO" : "CON SALDO"
+  };
+
+  let listaClientesRapida = JSON.parse(localStorage.getItem("clientes") || "[]");
+  if (!listaClientesRapida.includes(clienteNombre)) {
+    listaClientesRapida.push(clienteNombre);
+    localStorage.setItem("clientes", JSON.stringify(listaClientesRapida));
+    cargarLista();
+  }
+
+  const URL_GOOGLE_DRIVE = "https://script.google.com/macros/s/AKfycbx2ka6m6HKzLLhWP0qDx_a6Gj1MgQIAQGtapWoyX-FlmkvKAiBFnHbjeiV189xW-HA/exec";
+
+  fetch(URL_GOOGLE_DRIVE, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(nuevoRegistro)
+  })
+  .then(() => console.log("¡Sincronizado con Google Drive exitosamente!"))
+  .catch(err => console.error("Error de conexión con Drive:", err));
+
+  generarImagenParaCompartir();
 }
 
 function generarImagenParaCompartir(){
@@ -324,7 +407,7 @@ function generarImagenParaCompartir(){
  let textosCant = document.querySelectorAll(".txt-cant");
  let textosPrecio = document.querySelectorAll(".txt-precio");
  
- btnAdd.style.display = "none";
+ if(btnAdd) btnAdd.style.display = "none";
  d.forEach(x => x.style.display = "none");
  
  inputsCant.forEach(i => i.style.display = "none");
@@ -332,15 +415,20 @@ function generarImagenParaCompartir(){
  textosCant.forEach(t => t.style.display = "inline-block");
  textosPrecio.forEach(t => t.style.display = "inline-block");
 
- html2canvas(document.getElementById("recibo"), {scale: 2}).then(canvas => {
+ let elementoRecibo = document.getElementById("recibo");
+ if(!elementoRecibo) return;
+
+ html2canvas(elementoRecibo, {scale: 2}).then(canvas => {
   let img = document.createElement("img");
   img.src = canvas.toDataURL("image/png");
   
-  contenedorImagenModal.innerHTML = "";
-  contenedorImagenModal.appendChild(img);
-  miModal.style.display = "flex";
+  if(contenedorImagenModal) {
+    contenedorImagenModal.innerHTML = "";
+    contenedorImagenModal.appendChild(img);
+  }
+  if(miModal) miModal.style.display = "flex";
 
-  btnAdd.style.display = "block";
+  if(btnAdd) btnAdd.style.display = "block";
   d.forEach(x => x.style.display = "inline-block");
   inputsCant.forEach(i => i.style.display = "inline-block");
   inputsPrecio.forEach(i => i.style.display = "inline-block");
@@ -354,7 +442,7 @@ function generarImagenParaCompartir(){
 }
 
 function cerrarModal() {
-  miModal.style.display = "none";
+  if(miModal) miModal.style.display = "none";
 }
 
 function ajustarNumeroManual() {
@@ -364,68 +452,6 @@ function ajustarNumeroManual() {
     localStorage.setItem("nroReciboCorrelativo", numeroActual);
     actualizarVisorNumero();
   }
-  function sincronizarConNube() {
-  fetch(SCRIPT_URL)
-    .then(res => res.json())
-    .then(data => {
-      baseDeDatosNube = data;
-      actualizarSelectorClientes();
-    })
-    .catch(() => {
-      listaClientes.innerHTML = '<option value="">📁 Error de conexión nube</option>';
-    });
-}
-
-function actualizarSelectorClientes() {
-  let nombresUnicos = [...new Set(baseDeDatosNube.map(item => item.cliente.trim()))].sort();
-  listaClientes.innerHTML = '<option value="">📁 Clientes en Google Sheets</option>';
-  nombresUnicos.forEach(nombre => {
-    if(nombre) {
-      let o = document.createElement("option");
-      o.value = nombre; o.textContent = nombre;
-      listaClientes.appendChild(o);
-    }
-  });
-}
-
-function guardarCliente(){
- let nombreCliente = clienteInp.value.trim();
- if(!nombreCliente) return alert("Por favor escribe el nombre de un cliente.");
-
- let productosLlevados = [];
- cuerpoTabla.querySelectorAll("tr").forEach(tr => {
-    let det = tr.querySelector(".prod-detalle").value || "Sello";
-    let cant = tr.querySelector(".prod-cant").value || 1;
-    let prec = tr.querySelector(".prod-precio").value || 0;
-    if(prec > 0) productosLlevados.push(`${cant}x ${det} (Bs. ${Number(prec)})`);
- });
-
- let datosAEnviar = {
-    recibo: nroReciboTexto.innerText,
-    fecha: fechaInp.value,
-    cliente: nombreCliente,
-    detalles: productosLlevados.join(", ") || "Ficha cliente",
-    total: totalEl.innerText.replace("TOTAL: Bs. ", ""),
-    obs: observacionInp.value.trim() || "Sin notas."
- };
-
- fetch(SCRIPT_URL, {
-   method: "POST",
-   mode: "no-cors",
-   headers: { "Content-Type": "application/json" },
-   body: JSON.stringify(datosAEnviar)
- })
- .then(() => {
-   alert("¡Éxito! Guardado en Google Sheets.");
-   setTimeout(sincronizarConNube, 1500); 
- });
-}
-
-function cargarCliente(){
- if(listaClientes.value) {
-   clienteInp.value = listaClientes.value;
- }
-}
 }
 </script>
 
