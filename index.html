@@ -240,7 +240,6 @@ input[type=number] { -moz-appearance: textfield; }
 </div>
 
 <script>
-// PEGA TU ENLACE DE GOOGLE APPS SCRIPT AQUÍ ABAJO
 const URL_GOOGLE_DRIVE = "https://script.google.com/macros/s/AKfycbzaFHSLkUnh_cp9HPfWT-7zKvQpZwi0eJhfHliVOBfJWE3p9tl8dLRkWYpvPd8K7FI/exec";
 
 const totalEl = document.getElementById("total");
@@ -258,14 +257,16 @@ const seccionHistorial = document.getElementById("seccionHistorial");
 const historialContenido = document.getElementById("historialContenido");
 
 let numeroActual = parseInt(localStorage.getItem("nroReciboCorrelativo")) || 1;
+// Corregido: Ahora lee directo del teléfono en tiempo real cada vez que presionas el botón
+let ultimoReciboEnviado = "";
 let globalTotal = 0;
 let globalSaldo = 0;
 
 window.onload = ()=>{
   if(fechaInp) fechaInp.value = new Date().toISOString().split('T')[0];
   actualizarVisorNumero();
-  cargarLista(); // Carga lo que hay local temporalmente
-  sincronizarConGoogle(); // Se conecta a tu Excel para descargar todo
+  cargarLista();
+  sincronizarConGoogle();
   agregarFila();
 }
 
@@ -341,7 +342,6 @@ function calcular(){
  }
 }
 
-// FUNCIÓN DE SINCRONIZACIÓN AUTOMÁTICA
 function sincronizarConGoogle() {
   fetch(URL_GOOGLE_DRIVE)
     .then(res => res.json())
@@ -445,7 +445,19 @@ function procesarEnvioYGuardado() {
   if(!clienteInp || !fechaInp) return;
   let clienteNombre = clienteInp.value.trim();
   let fechaRecibo = fechaInp.value;
-  
+  let nroFormateado = String(numeroActual).padStart(5, '0');
+
+  // 🛑 CONTROL ANTIDUPLICADOS MEJORADO (Por contenido)
+  let ultimaFirmaEnvio = localStorage.getItem("ultimaFirmaEnvio") || "";
+  let firmaActual = `${clienteNombre}-${globalTotal}-${globalSaldo}`;
+
+  if (firmaActual === ultimaFirmaEnvio) {
+    let confirmarReenvio = confirm(`⚠️ Detectamos que este recibo ya fue enviado y guardado en tu Excel.\n\n¿Estás seguro de que quieres volver a enviarlo? (Si le das Cancelar, evitarás duplicar datos).`);
+    if (!confirmarReenvio) {
+      return; // Detiene el envío por completo
+    }
+  }
+
   let obsInput = document.getElementById("observaciones");
   let obsTexto = obsInput ? obsInput.value.trim() : "";
   
@@ -476,7 +488,6 @@ function procesarEnvioYGuardado() {
     return;
   }
 
-  let nroFormateado = String(numeroActual).padStart(5, '0');
   let detallesTexto = productos.join(" | ");
   let totalNum = globalTotal;
   let saldoNum = globalSaldo;
@@ -510,6 +521,9 @@ function procesarEnvioYGuardado() {
   })
   .then(() => console.log("¡Sincronizado exitosamente!"))
   .catch(err => console.error("Error de conexión:", err));
+
+  // 💾 Guarda la combinación de cliente + total para bloquear repeticiones
+  localStorage.setItem("ultimaFirmaEnvio", firmaActual);
 
   generarImagenParaCompartir();
 }
