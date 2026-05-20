@@ -87,4 +87,383 @@ input[type=number] { -moz-appearance: textfield; }
   align-items: center;
   flex-direction: column;
 }
-.modal-contenido
+.modal-contenido {
+  background: #fff;
+  padding: 10px;
+  border-radius: 20px;
+  max-width: 90%;
+  max-height: 75%;
+  text-align: center;
+  overflow-y: auto;
+}
+.modal-contenido img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 15px;
+}
+.modal-instruccion {
+  color: #fff;
+  margin-top: 15px;
+  font-size: 14px;
+  text-align: center;
+  padding: 0 20px;
+}
+.btn-cerrar {
+  background: #E30613;
+  margin-top: 15px;
+  width: auto;
+  padding: 10px 25px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="contenedor-principal">
+
+  <div id="recibo">
+    <div class="header">
+      <div class="header-top">
+        <div class="header-info">
+          <img src="logo.png" alt="Logo">
+          <div>
+            <h2 style="margin:0;">ROYGARCIA</h2>
+            <p style="margin:4px 0 0 0;font-size:13px;opacity:0.85;">Sellos personalizados</p>
+          </div>
+        </div>
+        <div class="nro-recibo">
+          Nº <span id="nroReciboTexto">00001</span>
+        </div>
+      </div>
+      <div class="header-contacto">
+        Dir, calle aroma 332, celular 69240891
+      </div>
+    </div>
+
+    <div class="titulo">RECIBO</div>
+
+    <div class="contenido">
+      
+      <div id="marcaCancelado" class="marca-agua">Cancelado</div>
+
+      <div class="fila">
+        <b>Cliente:</b>
+        <input id="cliente" placeholder="Nombre cliente">
+      </div>
+
+      <div class="fila">
+        <b>Fecha:</b>
+        <input id="fecha" type="date">
+      </div>
+
+      <table id="tabla">
+        <thead>
+          <tr>
+            <td><b>Detalle</b></td>
+            <td><b>Cant</b></td>
+            <td><b>Precio</b></td>
+            <td><b>Sub</b></td>
+            <td></td>
+          </tr>
+        </thead>
+        <tbody id="cuerpoTabla">
+        </tbody>
+      </table>
+
+      <button class="add" onclick="agregarFila()">+ Agregar producto</button>
+
+      <div class="fila" style="margin-top:15px;">
+        <b>Observaciones / Razón del precio:</b>
+        <input id="observaciones" placeholder="Ej. Se hizo rebaja por cliente frecuente o detalle">
+      </div>
+
+      <div class="fila" style="margin-top:15px;">
+        <b>Adelanto:</b>
+        <input id="adelanto" type="number" placeholder="0" oninput="calcular()">
+      </div>
+
+      <div class="totales">
+        <div class="total" id="total">TOTAL: Bs. 0</div>
+        <div class="saldo" id="saldo">SALDO: Bs. 0</div>
+      </div>
+      
+      <div class="pie-recibo">
+        "RoyGarcia" forma parte del grupo Galan
+      </div>
+    </div>
+  </div>
+
+  <div class="panel-controles">
+    <select id="listaClientes" class="select-interno" onchange="cargarCliente()">
+      <option value="">📁 Clientes guardados</option>
+    </select>
+    <button class="save" onclick="guardarCliente()">Guardar Cliente</button>
+    <button class="wa" onclick="procesarEnvioYGuardado()">Enviar por WhatsApp</button>
+    <button class="reset-btn" onclick="ajustarNumeroManual()">⚙️ Ajustar número de recibo inicial</button>
+  </div>
+
+</div>
+
+<div id="miModal" class="modal">
+  <div class="modal-contenido" id="contenedorImagenModal"></div>
+  <p class="modal-instruccion">📱 <b>Mantén presionada la imagen</b> para copiarla o compartirla directo a WhatsApp.</p>
+  <button class="btn-cerrar" onclick="cerrarModal()">Regresar al Recibo</button>
+</div>
+
+<script>
+const totalEl = document.getElementById("total");
+const saldoEl = document.getElementById("saldo");
+const cuerpoTabla = document.getElementById("cuerpoTabla");
+const clienteInp = document.getElementById("cliente");
+const fechaInp = document.getElementById("fecha");
+const listaClientes = document.getElementById("listaClientes");
+const adelantoInp = document.getElementById("adelanto");
+const miModal = document.getElementById("miModal");
+const contenedorImagenModal = document.getElementById("contenedorImagenModal");
+const nroReciboTexto = document.getElementById("nroReciboTexto");
+const marcaCancelado = document.getElementById("marcaCancelado");
+
+let numeroActual = parseInt(localStorage.getItem("nroReciboCorrelativo")) || 1;
+let globalTotal = 0;
+let globalSaldo = 0;
+
+window.onload = ()=>{
+  if(fechaInp) fechaInp.value = new Date().toISOString().split('T')[0];
+  actualizarVisorNumero();
+  cargarLista();
+  agregarFila();
+}
+
+function actualizarVisorNumero() {
+  if(nroReciboTexto) nroReciboTexto.innerText = String(numeroActual).padStart(5, '0');
+}
+
+function bs(n){ 
+  return "Bs. " + (Number(n) || 0).toLocaleString('es-BO', {minimumFractionDigits: 2, maximumFractionDigits: 2}); 
+}
+
+function agregarFila(){
+ let tr = document.createElement("tr");
+ tr.innerHTML = `
+  <td><input placeholder="Producto" class="prod-detalle"></td>
+  <td>
+    <input type="number" placeholder="1" oninput="calcular()" class="prod-cant" style="width:40px;">
+    <span class="texto-referencia txt-cant">1</span>
+  </td>
+  <td>
+    <input type="number" placeholder="0" oninput="calcular()" class="prod-precio" style="width:60px;">
+    <span class="texto-referencia txt-precio">0</span>
+  </td>
+  <td class="subtotal">Bs. 0.00</td>
+  <td><button class="del" onclick="this.closest('tr').remove();calcular()">X</button></td>
+ `;
+ if(cuerpoTabla) {
+   cuerpoTabla.appendChild(tr);
+   calcular();
+ }
+}
+
+function calcular(){
+ let total = 0;
+ if(!cuerpoTabla) return;
+ let filas = cuerpoTabla.querySelectorAll("tr");
+
+ filas.forEach(tr => {
+  let txtCant = tr.querySelector(".txt-cant");
+  let txtPrecio = tr.querySelector(".txt-precio");
+  let prodCantInput = tr.querySelector(".prod-cant");
+  let prodPrecioInput = tr.querySelector(".prod-precio");
+
+  let cantRaw = prodCantInput ? prodCantInput.value : "";
+  let cant = cantRaw === "" ? 1 : (Number(cantRaw) || 0);
+  let precio = prodPrecioInput ? (Number(prodPrecioInput.value) || 0) : 0;
+
+  if(txtCant) txtCant.innerText = cant;
+  if(txtPrecio) txtPrecio.innerText = precio;
+
+  let sub = cant * precio;
+  let subtotalEl = tr.querySelector(".subtotal");
+  if(subtotalEl) subtotalEl.innerText = bs(sub);
+
+  total += sub;
+ });
+
+ let adel = adelantoInp ? (Number(adelantoInp.value) || 0) : 0;
+ let saldoCalculado = total - adel;
+
+ globalTotal = total;
+ globalSaldo = saldoCalculado;
+
+ if(totalEl) totalEl.innerText = "TOTAL: " + bs(total);
+ if(saldoEl) saldoEl.innerText = "SALDO: " + bs(saldoCalculado);
+
+ if(marcaCancelado) {
+   if(total > 0 && saldoCalculado <= 0) {
+     marcaCancelado.style.display = "block";
+   } else {
+     marcaCancelado.style.display = "none";
+   }
+ }
+}
+
+function guardarCliente(){
+ if(!clienteInp) return;
+ let n = clienteInp.value.trim();
+ if(!n) return alert("Escribe un nombre de cliente primero.");
+
+ let lista = JSON.parse(localStorage.getItem("clientes")||"[]");
+ if(!lista.includes(n)){
+  lista.push(n);
+  localStorage.setItem("clientes", JSON.stringify(lista));
+  cargarLista();
+  alert("Cliente guardado con éxito.");
+ } else {
+  alert("El cliente ya estaba guardado.");
+ }
+}
+
+function cargarLista(){
+ if(!listaClientes) return;
+ let lista = JSON.parse(localStorage.getItem("clientes")||"[]");
+ listaClientes.innerHTML = '<option value="">📁 Clientes guardados</option>';
+ lista.forEach(c=>{
+  let o = document.createElement("option");
+  o.value = c;
+  o.textContent = c;
+  listaClientes.appendChild(o);
+ });
+}
+
+function cargarCliente(){
+ if(listaClientes && clienteInp && listaClientes.value) {
+   clienteInp.value = listaClientes.value;
+ }
+}
+
+/* FUNCIÓN DE ENVÍO ACTUALIZADA CON OBSERVACIONES */
+function procesarEnvioYGuardado() {
+  if(!clienteInp || !fechaInp) return;
+  let clienteNombre = clienteInp.value.trim();
+  let fechaRecibo = fechaInp.value;
+  
+  let obsInput = document.getElementById("observaciones");
+  let obsTexto = obsInput ? obsInput.value.trim() : "";
+  
+  if (!clienteNombre) {
+    alert("❌ Error: Debes ingresar el nombre del cliente antes de enviar.");
+    return;
+  }
+
+  if(!cuerpoTabla) return;
+  let productos = [];
+  let filas = cuerpoTabla.querySelectorAll("tr");
+  filas.forEach(tr => {
+    let detalleInput = tr.querySelector(".prod-detalle");
+    let detalle = detalleInput ? detalleInput.value.trim() : "";
+    let cantRawInput = tr.querySelector(".prod-cant");
+    let cantRaw = cantRawInput ? cantRawInput.value : "";
+    let cant = cantRaw === "" ? 1 : (Number(cantRaw) || 0);
+    let precioInput = tr.querySelector(".prod-precio");
+    let precio = precioInput ? (Number(precioInput.value) || 0) : 0;
+    
+    if (detalle !== "" || precio > 0) {
+      productos.push(`${cant}x ${detalle} (${bs(precio)})`);
+    }
+  });
+
+  if (productos.length === 0) {
+    alert("❌ Error: El recibo debe tener al menos un producto.");
+    return;
+  }
+
+  let nuevoRegistro = {
+    nroRecibo: String(numeroActual).padStart(5, '0'),
+    fecha: fechaRecibo,
+    cliente: clienteNombre,
+    detalles: productos.join(" | "),
+    observaciones: obsTexto,
+    total: globalTotal,
+    adelanto: adelantoInp ? (Number(adelantoInp.value) || 0) : 0,
+    saldo: globalSaldo,
+    estado: globalSaldo <= 0 ? "CANCELADO" : "CON SALDO"
+  };
+
+  let listaClientesRapida = JSON.parse(localStorage.getItem("clientes") || "[]");
+  if (!listaClientesRapida.includes(clienteNombre)) {
+    listaClientesRapida.push(clienteNombre);
+    localStorage.setItem("clientes", JSON.stringify(listaClientesRapida));
+    cargarLista();
+  }
+
+  const URL_GOOGLE_DRIVE = "https://script.google.com/macros/s/AKfycbzaqbXRGcuTUdWG9kGIrOHgLAfKlZUMSn5qJBrrswoTwPJrVyt7_dcT3QCVjD3Q_kY/exec";
+
+  fetch(URL_GOOGLE_DRIVE, {
+    method: "POST",
+    mode: "no-cors",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(nuevoRegistro)
+  })
+  .then(() => console.log("¡Sincronizado con Google Drive exitosamente!"))
+  .catch(err => console.error("Error de conexión con Drive:", err));
+
+  generarImagenParaCompartir();
+}
+
+function generarImagenParaCompartir(){
+ let d = document.querySelectorAll(".del");
+ let btnAdd = document.querySelector(".add");
+ let inputsCant = document.querySelectorAll(".prod-cant");
+ let inputsPrecio = document.querySelectorAll(".prod-precio");
+ let textosCant = document.querySelectorAll(".txt-cant");
+ let textosPrecio = document.querySelectorAll(".txt-precio");
+ 
+ if(btnAdd) btnAdd.style.display = "none";
+ d.forEach(x => x.style.display = "none");
+ 
+ inputsCant.forEach(i => i.style.display = "none");
+ inputsPrecio.forEach(i => i.style.display = "none");
+ textosCant.forEach(t => t.style.display = "inline-block");
+ textosPrecio.forEach(t => t.style.display = "inline-block");
+
+ let elementoRecibo = document.getElementById("recibo");
+ if(!elementoRecibo) return;
+
+ html2canvas(elementoRecibo, {scale: 2}).then(canvas => {
+  let img = document.createElement("img");
+  img.src = canvas.toDataURL("image/png");
+  
+  if(contenedorImagenModal) {
+    contenedorImagenModal.innerHTML = "";
+    contenedorImagenModal.appendChild(img);
+  }
+  if(miModal) miModal.style.display = "flex";
+
+  if(btnAdd) btnAdd.style.display = "block";
+  d.forEach(x => x.style.display = "inline-block");
+  inputsCant.forEach(i => i.style.display = "inline-block");
+  inputsPrecio.forEach(i => i.style.display = "inline-block");
+  textosCant.forEach(t => t.style.display = "none");
+  textosPrecio.forEach(t => t.style.display = "none");
+
+  numeroActual++;
+  localStorage.setItem("nroReciboCorrelativo", numeroActual);
+  actualizarVisorNumero();
+ });
+}
+
+function cerrarModal() {
+  if(miModal) miModal.style.display = "none";
+}
+
+function ajustarNumeroManual() {
+  let nuevoNumero = prompt("¿Desde qué número de recibo deseas continuar?", numeroActual);
+  if (nuevoNumero !== null && !isNaN(nuevoNumero) && nuevoNumero.trim() !== "") {
+    numeroActual = parseInt(nuevoNumero);
+    localStorage.setItem("nroReciboCorrelativo", numeroActual);
+    actualizarVisorNumero();
+  }
+}
+</script>
+
+</body>
+</html>
