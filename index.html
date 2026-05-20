@@ -173,6 +173,11 @@ input[type=number] { -moz-appearance: textfield; }
       <button class="add" onclick="agregarFila()">+ Agregar producto</button>
 
       <div class="fila" style="margin-top:15px;">
+        <b>Observaciones / Razón del precio:</b>
+        <input id="observaciones" placeholder="Ej. Se hizo rebaja por cliente frecuente o detalle">
+      </div>
+
+      <div class="fila" style="margin-top:15px;">
         <b>Adelanto:</b>
         <input id="adelanto" type="number" placeholder="0" oninput="calcular()">
       </div>
@@ -335,10 +340,14 @@ function cargarCliente(){
  }
 }
 
+/* FUNCIÓN DE ENVÍO ACTUALIZADA CON OBSERVACIONES */
 function procesarEnvioYGuardado() {
   if(!clienteInp || !fechaInp) return;
   let clienteNombre = clienteInp.value.trim();
   let fechaRecibo = fechaInp.value;
+  
+  let obsInput = document.getElementById("observaciones");
+  let obsTexto = obsInput ? obsInput.value.trim() : "";
   
   if (!clienteNombre) {
     alert("❌ Error: Debes ingresar el nombre del cliente antes de enviar.");
@@ -372,6 +381,7 @@ function procesarEnvioYGuardado() {
     fecha: fechaRecibo,
     cliente: clienteNombre,
     detalles: productos.join(" | "),
+    observaciones: obsTexto,
     total: globalTotal,
     adelanto: adelantoInp ? (Number(adelantoInp.value) || 0) : 0,
     saldo: globalSaldo,
@@ -385,7 +395,7 @@ function procesarEnvioYGuardado() {
     cargarLista();
   }
 
-  const URL_GOOGLE_DRIVE = "https://script.google.com/macros/s/AKfycbx2ka6m6HKzLLhWP0qDx_a6Gj1MgQIAQGtapWoyX-FlmkvKAiBFnHbjeiV189xW-HA/exec";
+  const URL_GOOGLE_DRIVE = "https://script.google.com/macros/s/AKfycbzaqbXRGcuTUdWG9kGIrOHgLAfKlZUMSn5qJBrrswoTwPJrVyt7_dcT3QCVjD3Q_kY/exec";
 
   fetch(URL_GOOGLE_DRIVE, {
     method: "POST",
